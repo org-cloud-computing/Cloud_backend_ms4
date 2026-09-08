@@ -1,0 +1,79 @@
+# Entornos virtuales de Python
+venv/
+env/
+.venv/
+ENV/
+
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Archivos de distribución
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+
+# Archivos de entorno (variables sensibles)
+.env
+.env.local
+.env.*.local
+.env.example
+
+# Directorios de control de versiones
+.git/
+.gitignore
+.gitattributes
+
+# Archivos de IDE (Visual Studio Code, PyCharm, etc.)
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.ropeproject
+
+# Archivos de pruebas y cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+
+# Logs y archivos temporales
+*.log
+*.tmp
+*.temp
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Documentación (opcional, si no quieres que esté dentro del contenedor)
+README.md
+docs/
+*.md
+
+# Archivos de Docker (no necesitas copiar el Dockerfile dentro de sí mismo)
+Dockerfile
+.dockerignore
+
+# Archivos de despliegue o CI/CD
+.github/
+.gitlab/
+.terraform/
+*.tfstate

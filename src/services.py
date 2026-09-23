@@ -7,7 +7,10 @@ import logging
 from typing import List, Dict, Any
 from fastapi import HTTPException
 
-from src.models import CheckoutRequest, CheckoutResponse, ItemCarritoResponse
+from src.models import (
+    CheckoutRequest, CheckoutResponse, ItemCarritoResponse,
+    ReservarStockRequest, CrearPedidoRequest, CrearPagoRequest
+)
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -304,3 +307,81 @@ class CheckoutService:
                 return resp.json()
             except httpx.HTTPError as e:
                 raise HTTPException(503, f"Error al obtener historial: {str(e)}")
+
+    # ===== ENDPOINTS PROXY: stock / pedidos / pagos =====
+    # A diferencia de procesar(), estos métodos NO orquestan nada ni hacen
+    # rollback: son llamadas directas y puntuales a ms1/ms2, pensadas para
+    # usarse fuera del flujo completo de checkout.
+
+    async def reservar_stock(self, request: ReservarStockRequest) -> Dict[str, Any]:
+        """Reserva stock de un producto para un cliente (proxy a ms1)."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                resp = await client.patch(
+                    f"{self.ms1_url}/ms1/stock/reservar",
+                    json={
+                        "product_id": request.producto_id,
+                        "client_id": request.cliente_id,
+                        "cantidad": request.cantidad
+                    }
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except httpx.HTTPStatusError as e:
+                # ms1 respondió con un error de negocio (ej. 409 stock insuficiente):
+                # se lo propagamos al cliente tal cual, no es un error de red.
+                raise HTTPException(
+                    e.response.status_code,
+                    f"No se pudo reservar stock: {e.response.text}"
+                )
+            except httpx.HTTPError as e:
+                raise HTTPException(503, f"Error al reservar stock: {str(e)}")
+
+    async def crear_pedido(self, request: CrearPedidoRequest) -> Dict[str, Any]:
+        """Crea un pedido directamente (proxy a ms2)."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                resp = await client.post(
+                    f"{self.ms2_url}/ms2/pedidos",
+                    json={
+                        "cliente_id": request.cliente_id,
+                        "subtotal": request.subtotal,
+                        "impuestos": request.impuestos,
+                        "total": request.total,
+                        "direccion_envio": request.direccion_envio,
+                        "metodo_pago": request.metodo_pago.value
+                    }
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except httpx.HTTPStatusError as e:
+                # ms2 respondió 400 (ej. validación de Sequelize) -> se propaga tal cual
+                raise HTTPException(
+                    e.response.status_code,
+                    f"No se pudo crear el pedido: {e.response.text}"
+                )
+            except httpx.HTTPError as e:
+                raise HTTPException(503, f"Error al crear pedido: {str(e)}")
+
+    async def registrar_pago(self, request: CrearPagoRequest) -> Dict[str, Any]:
+        """Registra un pago directamente (proxy a ms2)."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                resp = await client.post(
+                    f"{self.ms2_url}/ms2/pagos",
+                    json={
+                        "pedido_id": request.pedido_id,
+                        "monto": request.monto,
+                        "metodo_pago": request.metodo_pago.value,
+                        "estado_pago": request.estado_pago.value
+                    }
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except httpx.HTTPStatusError as e:
+                raise HTTPException(
+                    e.response.status_code,
+                    f"No se pudo registrar el pago: {e.response.text}"
+                )
+            except httpx.HTTPError as e:
+                raise HTTPException(503, f"Error al registrar pago: {str(e)}")

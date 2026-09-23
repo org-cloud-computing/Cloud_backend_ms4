@@ -4,7 +4,11 @@ import httpx
 import logging
 from datetime import datetime
 
-from src.models import CheckoutRequest, CheckoutResponse, HealthResponse
+from src.models import (
+    CheckoutRequest, CheckoutResponse, HealthResponse,
+    ReservarStockRequest, ReservarStockResponse,
+    CrearPedidoRequest, CrearPagoRequest
+)
 from src.services import CheckoutService
 from src.config import settings
 
@@ -88,6 +92,8 @@ async def obtener_estado_pedido(pedido_id: int):
     try:
         estado = await checkout_service.obtener_estado(pedido_id)
         return estado
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -98,7 +104,56 @@ async def obtener_historial_cliente(cliente_id: int):
     try:
         historial = await checkout_service.obtener_historial(cliente_id)
         return historial
+    except HTTPException:
+        raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== ENDPOINTS PROXY: stock / pedidos / pagos ==========
+# Estos 3 endpoints exponen, de forma directa e independiente del flujo de
+# /checkout, las mismas operaciones que CheckoutService ya usa internamente
+# contra ms1 y ms2. No hacen orquestación ni rollback: son proxies puntuales.
+
+@router.patch("/stock/reservar", response_model=ReservarStockResponse)
+async def reservar_stock(request: ReservarStockRequest):
+    """Reserva stock de un producto para un cliente (proxy a ms1: PATCH /ms1/stock/reservar)"""
+    logger.info(
+        f"Reservando stock: producto {request.producto_id}, "
+        f"cliente {request.cliente_id}, cantidad {request.cantidad}"
+    )
+    try:
+        return await checkout_service.reservar_stock(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al reservar stock: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pedidos", status_code=201)
+async def crear_pedido(request: CrearPedidoRequest):
+    """Crea un pedido (proxy a ms2: POST /ms2/pedidos)"""
+    logger.info(f"Creando pedido para cliente {request.cliente_id}")
+    try:
+        return await checkout_service.crear_pedido(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al crear pedido: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pagos", status_code=201)
+async def registrar_pago(request: CrearPagoRequest):
+    """Registra un pago (proxy a ms2: POST /ms2/pagos)"""
+    logger.info(f"Registrando pago para pedido {request.pedido_id}")
+    try:
+        return await checkout_service.registrar_pago(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al registrar pago: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

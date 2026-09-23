@@ -9,9 +9,11 @@ from enum import Enum
 # ========== ENUMS ==========
 
 class MetodoPago(str, Enum):
-    TARJETA_CREDITO = "tarjeta-credito"
+    # OJO: estos valores deben coincidir EXACTO con el ENUM de Pago.js en ms2
+    # (Sequelize: ENUM("tarjeta_credito", "debito", "paypal") -> guion bajo, no guion medio)
+    TARJETA_CREDITO = "tarjeta_credito"
     DEBITO = "debito"
-    PAGO = "pago"
+    PAYPAL = "paypal"
 
 class EstadoPedido(str, Enum):
     PENDIENTE = "pendiente"
